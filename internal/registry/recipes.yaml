@@ -1,0 +1,33 @@
+# yunku Recipe Registry
+#
+# Registry fields:
+# - name: unique id (directory: recipe-{name})
+# - title: recipe title
+# - description: compact intent text
+# - category: workflow domain
+# - services: canonical yunku product ids
+# - steps: concrete executable steps
+# - caution: optional warning for risky operations
+
+recipes:
+  - name: meeting-prep-and-share
+    title: 会议准备并共享材料
+    description: "创建会议议程文档，安排日程，并把材料链接同步到群聊。"
+    category: collaboration
+    services: [doc, chat, drive]
+    steps:
+      - "创建议程文档：`ykc mcp doc create_document --json '{\"title\":\"项目评审会-议程\"}' --format json`"
+      - "将文档链接发送到群聊：`ykc mcp chat send_message --json '{\"text\":\"会议材料已准备，请查看文档链接\"}' --format json`"
+    caution: "发送通知前确认群会话与参会人范围，避免误发。"
+
+  - name: drive-upload-and-announce
+    title: 上传钉盘并公告
+    description: "上传文件到钉盘并在群聊公告下载链接。"
+    category: file-management
+    services: [drive, chat]
+    steps:
+      - "查询上传参数：`ykc mcp drive upload_info --json '{\"name\":\"report.pdf\"}' --format json`"
+      - "提交上传：`ykc mcp drive commit --json '{\"name\":\"report.pdf\"}' --format json`"
+      - "群聊发送公告：`ykc mcp chat send_message --json '{\"text\":\"文件已上传到钉盘\"}' --format json`"
+    caution: "上传前确认文件内容不含敏感信息。"
+

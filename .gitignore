@@ -1,0 +1,12 @@
+ykc
+dist/
+dist-extra/
+.DS_Store
+.claude
+.idea
+.env
+.qoder
+.codebuddy
+AGENTS.md
+CLAUDE.md
+CODEBUDDY.md

@@ -1,0 +1,79 @@
+# GoReleaser configuration for ykc
+# Docs: https://goreleaser.com
+#
+# To release:
+#   git tag -a v0.1.0 -m "Release v0.1.0"
+#   git push origin v0.1.0
+#
+# To test locally (no publish):
+#   goreleaser release --snapshot --clean
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    # Build the skills zip outside dist/ — goreleaser cleans dist/ after the
+    # before hooks run. Referenced below via extra_files.
+    - ./scripts/release/build-skills-zip.sh ./dist-extra/ykc-skills.zip
+
+builds:
+  - main: ./cmd
+    binary: ykc
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -buildmode=pie
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/gokuai/yunku-cli/internal/app.version=v{{.Version}}
+      - -X github.com/gokuai/yunku-cli/internal/app.gitCommit={{.ShortCommit}}
+      - -X github.com/gokuai/yunku-cli/internal/app.buildTime={{.Date}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "ykc-{{ .Os }}-{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+  extra_files:
+    - glob: ./dist-extra/ykc-skills.zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: gokuai
+    name: yunku-cli
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+  mode: replace
+  extra_files:
+    - glob: ./dist-extra/ykc-skills.zip
