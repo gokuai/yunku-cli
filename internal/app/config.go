@@ -16,6 +16,13 @@ func init() {
 		DefaultValue: "~/.ykc",
 		Example:      "/opt/ykc/config",
 	})
+	configmeta.Register(configmeta.ConfigItem{
+		Name:         "YKC_KEYCHAIN_SERVICE",
+		Category:     configmeta.CategoryCore,
+		Description:  "覆盖 token 存储使用的 keychain 服务名 (默认 ykc-cli)，主要用于测试隔离",
+		DefaultValue: "ykc-cli",
+		Example:      "ykc-cli-test",
+	})
 }
 
 // Build-time variables injected via ldflags when available.

@@ -1845,6 +1845,14 @@ func (c *UserClient) GetServers(serverType, storagePoint, secret string) ([]Serv
 
 	var resp []ServerInfo
 	if err := json.Unmarshal(body, &resp); err != nil {
+		// 服务端在无可用服务器时返回 {"error_code":0}（对象而非数组），视为空列表；
+		// error_code 非 0 的情况已被 checkAPIError 拦截。
+		var status struct {
+			ErrorCode int `json:"error_code"`
+		}
+		if json.Unmarshal(body, &status) == nil && status.ErrorCode == 0 {
+			return []ServerInfo{}, nil
+		}
 		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
 	}
 

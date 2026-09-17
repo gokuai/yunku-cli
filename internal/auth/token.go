@@ -2,7 +2,9 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"time"
 
 	"github.com/gokuai/yunku-cli/pkg/edition"
@@ -82,6 +84,11 @@ func LoadTokenData(configDir string) (*TokenData, error) {
 	}
 	data, err := LoadSecureTokenData(configDir)
 	if err != nil {
+		// .data 不存在即未登录，返回空数据让调用方给出重新登录提示，
+		// 而不是暴露内部文件读取错误。
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if err := SaveTokenDataKeychain(data); err == nil {

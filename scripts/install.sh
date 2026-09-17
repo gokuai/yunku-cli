@@ -143,17 +143,24 @@ install_binary_from_source() {
   say "Installing ykc from source checkout: ${root}"
   say "Install dir: ${INSTALL_DIR}"
 
-  # Build using make (produces ./ykc in the project root)
-  make -C "$root" build
+  # Build into a temp file instead of the project root, so source installs
+  # never create or overwrite ./ykc in the developer's checkout.
+  build_tmp="$(mktemp "${TMPDIR:-/tmp}/ykc-build.XXXXXX")"
+  if ! (cd "$root" && YKC_BUILD_OUTPUT="$build_tmp" make build); then
+    rm -f "$build_tmp"
+    err "make build failed"
+  fi
 
-  built_bin="$root/$BIN_NAME"
-  if [ ! -f "$built_bin" ]; then
-    err "make build did not produce ${built_bin}"
+  built_bin="$build_tmp"
+  if [ ! -f "$built_bin" ] || [ ! -s "$built_bin" ]; then
+    rm -f "$build_tmp"
+    err "make build did not produce a binary"
   fi
 
   mkdir -p "$INSTALL_DIR"
   cp "$built_bin" "$INSTALL_DIR/$INSTALL_NAME"
   chmod +x "$INSTALL_DIR/$INSTALL_NAME"
+  rm -f "$build_tmp"
 
   say "✅ Binary installed:"
   say "   → ${INSTALL_DIR}/${INSTALL_NAME}"

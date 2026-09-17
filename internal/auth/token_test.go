@@ -7,11 +7,18 @@ import (
 	"github.com/gokuai/yunku-cli/internal/keychain"
 )
 
-// cleanupKeychain removes test data from keychain after test completes.
+// testKeychainService 是测试专用的隔离 keychain 服务名，
+// 避免测试读写/删除开发者本机真实存储的登录凭证。
+// 注意: go test 会并发运行不同包的测试进程，各包需使用不同的服务名以免互相干扰。
+const testKeychainService = "ykc-cli-test-auth"
+
+// cleanupKeychain isolates token storage to a test keychain service and
+// removes test data after the test completes.
 func cleanupKeychain(t *testing.T) {
 	t.Helper()
+	t.Setenv("YKC_KEYCHAIN_SERVICE", testKeychainService)
 	t.Cleanup(func() {
-		_ = keychain.Remove(keychain.Service, keychain.AccountToken)
+		_ = keychain.Remove(testKeychainService, keychain.AccountToken)
 	})
 }
 
@@ -64,8 +71,9 @@ func TestTokenSaveLoadAndDelete(t *testing.T) {
 	if TokenDataExistsKeychain() {
 		t.Fatal("TokenDataExistsKeychain() should be false after delete")
 	}
-	if _, err := LoadTokenData(configDir); err == nil {
-		t.Fatal("LoadTokenData() error = nil after delete, want failure")
+	// 删除后处于未登录状态：返回空数据而非报错，由调用方提示重新登录
+	if data, err := LoadTokenData(configDir); err != nil || data != nil {
+		t.Fatalf("LoadTokenData() after delete = (%v, %v), want (nil, nil)", data, err)
 	}
 }
 

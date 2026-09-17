@@ -11,8 +11,11 @@ import (
 )
 
 func TestSaveRefreshedGokuaiTokenKeepsOldRefreshTokenWhenNotRotated(t *testing.T) {
+	// 隔离 keychain 服务并清理测试数据，避免读写/删除真实登录凭证。
+	// go test 并发运行不同包的测试进程，各包需使用不同服务名以免互相干扰。
+	t.Setenv("YKC_KEYCHAIN_SERVICE", "ykc-cli-test-app")
 	t.Cleanup(func() {
-		_ = keychain.Remove(keychain.Service, keychain.AccountToken)
+		_ = keychain.Remove("ykc-cli-test-app", keychain.AccountToken)
 	})
 
 	configDir := filepath.Join(t.TempDir(), "config")
@@ -58,8 +61,11 @@ func TestSaveRefreshedGokuaiTokenKeepsOldRefreshTokenWhenNotRotated(t *testing.T
 }
 
 func TestSaveRefreshedGokuaiTokenReplacesRotatedRefreshToken(t *testing.T) {
+	// 隔离 keychain 服务并清理测试数据，避免读写/删除真实登录凭证。
+	// go test 并发运行不同包的测试进程，各包需使用不同服务名以免互相干扰。
+	t.Setenv("YKC_KEYCHAIN_SERVICE", "ykc-cli-test-app")
 	t.Cleanup(func() {
-		_ = keychain.Remove(keychain.Service, keychain.AccountToken)
+		_ = keychain.Remove("ykc-cli-test-app", keychain.AccountToken)
 	})
 
 	configDir := filepath.Join(t.TempDir(), "config")

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/gokuai/yunku-cli/internal/keychain"
@@ -13,6 +14,16 @@ var (
 	migrationOnce sync.Once
 	migrationDone bool
 )
+
+// tokenKeychainService 返回 token 存储使用的 keychain 服务名。
+// 默认为 keychain.Service；可通过环境变量 YKC_KEYCHAIN_SERVICE 覆盖，
+// 用于测试将 token 存储重定向到隔离服务，避免读写用户真实凭证。
+func tokenKeychainService() string {
+	if s := os.Getenv("YKC_KEYCHAIN_SERVICE"); s != "" {
+		return s
+	}
+	return keychain.Service
+}
 
 // SaveTokenDataKeychain saves TokenData to the platform keychain.
 // This is the new secure storage method using random master key.
@@ -28,7 +39,7 @@ func SaveTokenDataKeychain(data *TokenData) error {
 		}
 	}()
 
-	if err := keychain.Set(keychain.Service, keychain.AccountToken, string(jsonData)); err != nil {
+	if err := keychain.Set(tokenKeychainService(), keychain.AccountToken, string(jsonData)); err != nil {
 		return fmt.Errorf("save to keychain: %w", err)
 	}
 	return nil
@@ -36,7 +47,7 @@ func SaveTokenDataKeychain(data *TokenData) error {
 
 // LoadTokenDataKeychain loads TokenData from the platform keychain.
 func LoadTokenDataKeychain() (*TokenData, error) {
-	jsonStr, err := keychain.Get(keychain.Service, keychain.AccountToken)
+	jsonStr, err := keychain.Get(tokenKeychainService(), keychain.AccountToken)
 	if err != nil {
 		return nil, fmt.Errorf("load from keychain: %w", err)
 	}
@@ -53,12 +64,12 @@ func LoadTokenDataKeychain() (*TokenData, error) {
 
 // DeleteTokenDataKeychain removes TokenData from the platform keychain.
 func DeleteTokenDataKeychain() error {
-	return keychain.Remove(keychain.Service, keychain.AccountToken)
+	return keychain.Remove(tokenKeychainService(), keychain.AccountToken)
 }
 
 // TokenDataExistsKeychain checks if token data exists in keychain.
 func TokenDataExistsKeychain() bool {
-	return keychain.Exists(keychain.Service, keychain.AccountToken)
+	return keychain.Exists(tokenKeychainService(), keychain.AccountToken)
 }
 
 // EnsureMigration performs one-time migration from legacy .data to keychain.

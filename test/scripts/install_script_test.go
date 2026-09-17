@@ -24,20 +24,17 @@ func TestInstallScriptSourceModeInstallsBinary(t *testing.T) {
 		t.Fatalf("Abs(install.sh) error = %v", err)
 	}
 
-	// Stub make: when invoked as "make -C <dir> build", create a fake ykc binary
-	// in the project root (the -C target directory).
+	// Stub make: when invoked with YKC_BUILD_OUTPUT set, create a fake ykc
+	// binary at that path. install.sh builds into a temp file, so the real
+	// repo root is never touched.
 	stubRoot := filepath.Join(root, "stubs")
-	repoRoot, _ := filepath.Abs(filepath.Join("..", ".."))
 	makeStub := `#!/bin/sh
 set -eu
-dir=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    -C) dir="$2"; shift 2 ;;
-    *) shift ;;
-  esac
-done
-[ -n "$dir" ] && printf 'fake-binary\n' > "$dir/ykc"
+if [ -n "${YKC_BUILD_OUTPUT:-}" ]; then
+  printf 'fake-binary\n' > "$YKC_BUILD_OUTPUT"
+  exit 0
+fi
+exit 1
 `
 	mustWriteFile(t, filepath.Join(stubRoot, "make"), []byte(makeStub), 0o755)
 	// Also need a stub go so need_cmd check passes
@@ -50,9 +47,6 @@ done
 		"YKC_INSTALL_NAME=ykc-test",
 	)
 	output, err := cmd.CombinedOutput()
-
-	// Clean up the fake binary created in the real repo root
-	_ = os.Remove(filepath.Join(repoRoot, "ykc"))
 
 	if err != nil {
 		t.Fatalf("install.sh error = %v\noutput:\n%s", err, string(output))
@@ -93,17 +87,13 @@ func TestInstallScriptSourceModeInstallsSkillsIntoAgentsDir(t *testing.T) {
 	}
 
 	stubRoot := filepath.Join(root, "stubs")
-	repoRoot, _ := filepath.Abs(filepath.Join("..", ".."))
 	makeStub := `#!/bin/sh
 set -eu
-dir=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    -C) dir="$2"; shift 2 ;;
-    *) shift ;;
-  esac
-done
-[ -n "$dir" ] && printf 'fake-binary\n' > "$dir/ykc"
+if [ -n "${YKC_BUILD_OUTPUT:-}" ]; then
+  printf 'fake-binary\n' > "$YKC_BUILD_OUTPUT"
+  exit 0
+fi
+exit 1
 `
 	mustWriteFile(t, filepath.Join(stubRoot, "make"), []byte(makeStub), 0o755)
 	mustWriteFile(t, filepath.Join(stubRoot, "go"), []byte("#!/bin/sh\ntrue\n"), 0o755)
@@ -120,9 +110,6 @@ done
 		"YKC_INSTALL_DIR="+installDir,
 	)
 	output, err := cmd.CombinedOutput()
-
-	// Clean up the fake binary created in the real repo root
-	_ = os.Remove(filepath.Join(repoRoot, "ykc"))
 
 	if err != nil {
 		t.Fatalf("install.sh error = %v\noutput:\n%s", err, string(output))
