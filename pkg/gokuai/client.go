@@ -1545,11 +1545,10 @@ func (c *UserClient) FindPassword(email string, secret string) error {
 	return checkAPIError(body)
 }
 
-// SetAccountInfoResponse 设置用户相关信息响应
-type SetAccountInfoResponse struct {
-	MemberName string `json:"member_name"`
-	AvatarURL  string `json:"avatar_url"`
-}
+// SetAccountInfoResponse 设置用户相关信息响应。
+// 服务端只回显本次更新的字段（如 {"avatar":"/..."}、{"member_name":"..."}），
+// 字段名和数量不固定，用 map 原样透传，避免固定结构体导致字段解析为空。
+type SetAccountInfoResponse map[string]any
 
 // SetAccountInfo 设置用户相关信息 (用户 API, POST /m-api/1/account/set_info)
 // 当 fileBytes 非空时使用 multipart/form-data 上传头像文件
@@ -1945,8 +1944,8 @@ func (c *UserClient) UpdateEnt(entID, name, logo, secret string) error {
 
 // UploadAvatarResponse is the response for upload avatar API
 type UploadAvatarResponse struct {
-	URI       string `json:"uri"`
-	AvatarURL string `json:"avatar_url"`
+	URI string `json:"uri"`
+	URL string `json:"url"`
 }
 
 // UploadAvatar 上传头像 (用户 API, POST multipart/form-data)
