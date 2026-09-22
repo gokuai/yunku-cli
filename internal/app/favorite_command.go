@@ -125,7 +125,7 @@ func newFavoriteListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "获取收藏夹文件列表",
 		Example: `  ykc favorite list --fav-id 1
-  ykc favorite list --fav-id 1 --start 0 --size 20`,
+  ykc favorite list --fav-id 1 --start 0 --size 50`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			favID, _ := cmd.Flags().GetInt("fav-id")
 			start, _ := cmd.Flags().GetInt("start")
@@ -149,7 +149,7 @@ func newFavoriteListCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().Int("fav-id", -1, "收藏夹ID，-1表示默认收藏夹")
-	cmd.Flags().Int("start", 0, "开始位置")
-	cmd.Flags().Int("size", 20, "返回条数")
+	cmd.Flags().Int("start", 0, "开始位置（翻页需取返回结果的`next_start`，未返回表示已取完）")
+	cmd.Flags().Int("size", 50, "返回条数（最小 50）")
 	return cmd
 }

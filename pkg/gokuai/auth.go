@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gokuai/yunku-cli/pkg/device"
 )
 
 // AuthClient 够快云库认证客户端
@@ -31,6 +33,7 @@ type TokenResponse struct {
 	ExpiresIn        int    `json:"expires_in"`
 	RefreshToken     string `json:"refresh_token"`
 	RefreshExpiresIn int    `json:"refresh_expires_in"`
+	DeviceCount      int    `json:"device_count,omitempty"` // 超过设备数限制时返回
 	Error            string `json:"error,omitempty"`
 	ErrorDesc        string `json:"error_description,omitempty"`
 }
@@ -49,17 +52,26 @@ func NewAuthClient(clientID, clientSecret string) *AuthClient {
 func (c *AuthClient) LoginByPassword(username, password string) (*TokenResponse, error) {
 	// 密码需要 MD5 加密
 	passwordMD5 := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	return c.requestToken("password", map[string]string{
+	params := map[string]string{
 		"username": username,
 		"password": passwordMD5,
-	})
+	}
+	// 附带设备信息
+	for k, v := range device.Params(c.ClientID) {
+		params[k] = v
+	}
+	return c.requestToken("password", params)
 }
 
 // RefreshToken 刷新 token
 func (c *AuthClient) RefreshToken(refreshToken string) (*TokenResponse, error) {
-	return c.requestToken("refresh_token", map[string]string{
+	params := map[string]string{
 		"refresh_token": refreshToken,
-	})
+	}
+	if id := device.Collect().ID; id != "" {
+		params["device"] = id
+	}
+	return c.requestToken("refresh_token", params)
 }
 
 // ExchangeToken 第三方授权换取 token

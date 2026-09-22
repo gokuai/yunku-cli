@@ -1734,9 +1734,8 @@ func newFileQueueCommand() *cobra.Command {
 			queueID, _ := cmd.Flags().GetString("queue-id")
 			queueType, _ := cmd.Flags().GetString("type")
 
-			params := map[string]string{}
-			if queueID != "" {
-				params["queue_id"] = queueID
+			params := map[string]string{
+				"queue_id": queueID,
 			}
 			if queueType != "" {
 				params["type"] = queueType
@@ -1761,6 +1760,7 @@ func newFileQueueCommand() *cobra.Command {
 	}
 	cmd.Flags().String("queue-id", "", "队列ID,多个以逗号隔开")
 	cmd.Flags().String("type", "", "队列类型：不传：文件批处理；metadata：元数据批处理；zip：压缩包批处理")
+	cmd.MarkFlagRequired("queue-id")
 	return cmd
 }
 
@@ -1807,7 +1807,7 @@ func newFileKeywordCommand() *cobra.Command {
 	}
 	cmd.Flags().String("fullpath", "", "文件路径")
 	cmd.Flags().String("hash", "", "文件唯一标识")
-	cmd.Flags().String("keywords", "", "标签, 分号分隔, 如 '秋天;很美' (必需)")
+	cmd.Flags().String("keywords", "", "标签, 分号分隔, 如 '秋天;很美'")
 	cmd.MarkFlagRequired("keywords")
 	return cmd
 }

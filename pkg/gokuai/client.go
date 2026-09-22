@@ -430,6 +430,7 @@ func (c *UserClient) GetMountList(secret string) (*MountListResponse, error) {
 // FileListResponseV2 is the response for user file list API
 type FileListResponseV2 struct {
 	Count FlexInt      `json:"count,omitempty"`
+	NextStart int  `json:"next_start,omitempty"`
 	List  []FileInfoV2 `json:"list"`
 }
 
@@ -623,35 +624,6 @@ func (c *UserClient) GetFileInfo(mountID int, params map[string]string, secret s
 	}
 
 	var resp FileInfoResponseV2
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
-	}
-
-	return &resp, nil
-}
-
-// SearchFiles 搜索文件 (用户 API)
-func (c *UserClient) SearchFiles(mountID int, params map[string]string, secret string) (*FileListResponseV2, error) {
-	p := map[string]string{
-		"mount_id": fmt.Sprintf("%d", mountID),
-		"dateline": fmt.Sprintf("%d", time.Now().Unix()),
-	}
-	for k, v := range params {
-		if v != "" {
-			p[k] = v
-		}
-	}
-
-	body, err := c.doUserRequest("/m-api/2/file/search", p, secret)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := checkAPIError(body); err != nil {
-		return nil, err
-	}
-
-	var resp FileListResponseV2
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
 	}
@@ -1071,28 +1043,63 @@ func (c *UserClient) RemoveFromFavorites(req FavoritesRequest, secret string) er
 }
 
 // GetFavorites 获取收藏夹文件列表 (用户 API)
+// 服务端会过滤已失效的收藏条目（如文件已删除），单次请求返回条数可能少于 size。
+// 接口无 count 返回，只有返回空 list 才能判断已取完，因此按窗口（start 以 size
+// 步进）多次请求补齐，凑满 size 或返回空 list 后停止。size 不可小于 50。
 func (c *UserClient) GetFavorites(favID int, start, size int, secret string) (*FileListResponseV2, error) {
-	params := map[string]string{
-		"fav_id": fmt.Sprintf("%d", favID),
-		"start":  fmt.Sprintf("%d", start),
-		"size":   fmt.Sprintf("%d", size),
+	if size < 50 {
+		size = 50
 	}
 
-	body, err := c.doUserRequest("/m-api/1/favorites/get_files", params, secret)
+	fetch := func(start int) (*FileListResponseV2, error) {
+		params := map[string]string{
+			"fav_id": fmt.Sprintf("%d", favID),
+			"start":  fmt.Sprintf("%d", start),
+			"size":   fmt.Sprintf("%d", size),
+		}
+
+		body, err := c.doUserRequest("/m-api/1/favorites/get_files", params, secret)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := checkAPIError(body); err != nil {
+			return nil, err
+		}
+
+		var resp FileListResponseV2
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
+		}
+
+		return &resp, nil
+	}
+
+	merged, err := fetch(start)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := checkAPIError(body); err != nil {
-		return nil, err
+	last := merged
+	nextStart := 0
+	for cur := start + size; len(merged.List) < size && len(last.List) > 0; cur += size {
+		last, err = fetch(cur)
+		if err != nil {
+			return nil, err
+		}
+		merged.List = append(merged.List, last.List...)
+		nextStart = cur
 	}
 
-	var resp FileListResponseV2
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w, body: %s", err, string(body))
+	if len(merged.List) > size {
+		merged.List = merged.List[:size]
 	}
 
-	return &resp, nil
+	if len(merged.List) >= size {
+		merged.NextStart = nextStart
+	}
+
+	return merged, nil
 }
 
 // CreateLibraryResponse is the response for create library API
@@ -3008,6 +3015,12 @@ func (c *UserClient) GetQueueStatus(mountID int, params map[string]string, secre
 
 	if err := checkAPIError(body); err != nil {
 		return nil, err
+	}
+
+	// 接口在「队列为空」时返回成功对象 {"error_code":0}（而非空数组），
+	// 直接反序列化到 []map 会失败。把这种对象响应当作空队列处理。
+	if trimmed := bytes.TrimSpace(body); len(trimmed) > 0 && trimmed[0] == '{' {
+		return []map[string]interface{}{}, nil
 	}
 
 	var resp []map[string]interface{}
