@@ -9,6 +9,9 @@ ykc auth login --username <email> --password <password>
 # 查看状态
 ykc auth status
 
+# 通过 SSO 打开网页端
+ykc auth web
+
 # 刷新 Access Token
 ykc auth refresh
 

@@ -8,6 +8,20 @@
 
 > `ykc auth` 是其他所有命令的前置步骤，用于登录并获取 access_token。
 
+#### 通过 SSO 打开网页端
+```
+Usage:
+  ykc auth web [flags]
+Examples:
+  ykc auth web
+  ykc auth web --url https://yk3.gokuai.com/
+Flags:
+      --url string   网页端目标地址（默认使用 GOKUAI_API_HOST）
+```
+
+- `ykc auth web` 会复用本地登录凭证，必要时先刷新 access token，然后生成一次性 SSO 地址并打开默认浏览器。
+- `--url` 必须是完整的 `http` 或 `https` 地址；SSO 地址不会输出到终端。
+
 ---
 
 #### 用户名密码登录
@@ -75,6 +89,7 @@ Flags:
 
 - 说"登录"/"认证"/"login" → `auth login`
 - 说"浏览器登录"/"网页登录"/"扫码或浏览器授权登录" → `auth login --browser`
+- 说"打开网页端"/"进入网页端"（已完成 CLI 登录） → `auth web`
 - 说"登出"/"退出登录"/"logout" → `auth logout`
 - 说"刷新token"/"refresh" → `auth refresh`
 - 说"查看登录状态"/"认证状态" → `auth status`

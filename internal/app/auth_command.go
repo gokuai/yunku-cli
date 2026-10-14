@@ -29,6 +29,7 @@ func buildAuthCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		newAuthLoginCommand(),
+		newAuthWebCommand(),
 		newAuthRefreshCommand(),
 		newAuthStatusCommand(),
 		newAuthLogoutCommand(),
