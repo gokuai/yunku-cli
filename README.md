@@ -96,7 +96,8 @@ irm https://raw.githubusercontent.com/gokuai/yunku-cli/main/scripts/install.ps1 
 ## Quick Start
 
 ```bash
-ykc auth login                                                      # log in
+ykc auth login --browser                                        # log in via browser OAuth2
+ykc auth login -u <username> -p <password>                      # password login (headless Docker/SSH/CI)
 ykc contact group search --ent-id <ent-id> --keyword "engineering"  # search departments
 ykc contact member info --ent-id <ent-id> --member-id <id>          # get member info
 ```

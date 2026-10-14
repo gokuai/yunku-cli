@@ -75,11 +75,15 @@ func (c *AuthClient) RefreshToken(refreshToken string) (*TokenResponse, error) {
 }
 
 // ExchangeToken 第三方授权换取 token
-func (c *AuthClient) ExchangeToken(exchangeToken, domain string) (*TokenResponse, error) {
-	return c.requestToken("exchange_token", map[string]string{
+func (c *AuthClient) ExchangeToken(exchangeToken, auth string) (*TokenResponse, error) {
+	params := map[string]string{
 		"exchange_token": exchangeToken,
-		"domain":         domain,
-	})
+		"auth":           auth,
+	}
+	if id := device.Collect().ID; id != "" {
+		params["device"] = id
+	}
+	return c.requestToken("exchange_token", params)
 }
 
 // requestToken 通用请求 token
@@ -166,5 +170,3 @@ func (c *AuthClient) sign(params map[string]string) string {
 	h.Write([]byte(queryString))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
-
-

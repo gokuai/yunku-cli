@@ -59,10 +59,22 @@ func init() {
 		Sensitive:   true,
 	})
 	configmeta.Register(configmeta.ConfigItem{
+		Name:        "GOKUAI_OAUTH_CLIENT_ID",
+		Category:    configmeta.CategoryAuth,
+		Description: "浏览器 OAuth2 授权专用 client_id (ykc auth login --browser 使用，需在 passport 配置 127.0.0.1 回调；独立于企业设备凭证；授权无需 secret，登录后签名用 GOKUAI_USER_CLIENT_SECRET)",
+		Sensitive:   true,
+	})
+	configmeta.Register(configmeta.ConfigItem{
 		Name:         "GOKUAI_API_HOST",
 		Category:     configmeta.CategoryNetwork,
 		Description:  "够快 API 主机地址 (覆盖默认值，用于私有化部署或测试环境)",
 		DefaultValue: "yk3.gokuai.com",
+	})
+	configmeta.Register(configmeta.ConfigItem{
+		Name:         "GOKUAI_PASSPORT_DOMAIN",
+		Category:     configmeta.CategoryNetwork,
+		Description:  "够快 Passport 网页授权域名 (ykc auth login --browser 跳转的 OAuth2 登录页，用于私有化部署或测试环境)",
+		DefaultValue: "passport.gokuai.com",
 	})
 }
 

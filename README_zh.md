@@ -96,7 +96,8 @@ irm https://raw.githubusercontent.com/gokuai/yunku-cli/main/scripts/install.ps1 
 ## 快速开始
 
 ```bash
-ykc auth login                                             # 登录（无浏览器环境如 Docker、SSH、CI 也支持）
+ykc auth login --browser                                        # 浏览器 OAuth2 授权登录
+ykc auth login -u <用户名> -p <密码>                            # 密码登录（Docker、SSH、CI 等无浏览器环境）
 ykc contact group search --ent-id <ent-id> --keyword "技术部"  # 搜索部门
 ykc contact member info --ent-id <ent-id> --member-id <id>    # 查询成员
 ```

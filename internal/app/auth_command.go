@@ -18,7 +18,7 @@ func buildAuthCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "auth",
 		Short:             "够快云库认证",
-		Long:              "够快云库 API 认证管理，支持用户名密码登录、Token 刷新等。",
+		Long:              "够快云库 API 认证管理，支持用户名密码登录、浏览器 OAuth2 授权登录、Token 刷新等。",
 		Args:              cobra.NoArgs,
 		TraverseChildren:  true,
 		DisableAutoGenTag: true,
@@ -39,63 +39,59 @@ func buildAuthCommand() *cobra.Command {
 func newAuthLoginCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "用户名密码登录",
-		Example: `  ykc auth login --username user@example.com --password yourpassword
+		Short: "登录（密码登录或浏览器 OAuth2 授权登录）",
+		Example: `  ykc auth login --browser
+  ykc auth login -b
+  ykc auth login --username user@example.com --password yourpassword
   ykc auth login -u user@example.com -p yourpassword`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			browserLogin, _ := cmd.Flags().GetBool("browser")
 			username, _ := cmd.Flags().GetString("username")
 			password, _ := cmd.Flags().GetString("password")
+			var browserToken *browserTokenResult
 
-			if username == "" || password == "" {
-				return apperrors.NewValidation("用户名和密码不能为空")
-			}
-
-			var authClient *gokuai.AuthClient
-			var userClientID, userClientSecret string
-
-			// 优先使用 GOKUAI_USER_CLIENT_ID/SECRET 直接登录
-			if id := os.Getenv("GOKUAI_USER_CLIENT_ID"); id != "" {
-				secret := os.Getenv("GOKUAI_USER_CLIENT_SECRET")
-				if secret != "" {
-					slog.Info("using GOKUAI_USER_CLIENT_ID for login")
-					authClient = gokuai.NewAuthClient(id, secret)
-					userClientID = id
-					userClientSecret = secret
-				}
-			}
-
-			// 如果没有 user client id，走设备应用授权流程
-			if authClient == nil {
-				// 获取设备凭证
-				clientID := getEnvOrFlag(cmd, "client-id", "GOKUAI_CLIENT_ID")
-				clientSecret := getEnvOrFlag(cmd, "client-secret", "GOKUAI_CLIENT_SECRET")
-
-				// 使用设备凭证获取用户授权凭证
-				client := gokuai.NewClient(clientID, clientSecret)
-
-				oauthResp, err := client.GetClientOAuth()
+			// 浏览器 OAuth2 登录使用独立配置的 oauth client_id，
+			// 不需要 client_secret（passport 服务端自持 secret 完成换 token），
+			// 也不需要企业设备凭证（get_client_oauth）。
+			if browserLogin {
+				oauthClientID, err := resolveBrowserOAuthClientID(cmd)
 				if err != nil {
-					slog.Error("gokuai get client oauth failed", "error", err)
-					return apperrors.NewAuth(fmt.Sprintf("获取用户授权失败: %v", err), apperrors.WithCause(err))
+					return err
 				}
-
-				slog.Info("gokuai get client oauth success",
-					"user_client_id", oauthResp.ClientID,
-				)
-
-				userClientID = oauthResp.ClientID
-				userClientSecret = oauthResp.ClientSecret
-				authClient = gokuai.NewAuthClient(oauthResp.ClientID, oauthResp.ClientSecret)
+				browserToken, err = runBrowserLogin(cmd, oauthClientID)
+				if err != nil {
+					return err
+				}
 			}
 
-			// 记录登录请求参数（不包含密码）
-			slog.Info("gokuai auth login request",
-				"username", username,
-				"client_id", userClientID,
-				"grant_type", "password",
-			)
+			if browserToken == nil && (username == "" || password == "") {
+				return apperrors.NewValidation("用户名和密码不能为空，或使用 --browser 进行浏览器授权登录")
+			}
 
-			resp, err := authClient.LoginByPassword(username, password)
+			authClient, userClientID, userClientSecret, err := resolveUserOAuthClient(cmd)
+			if err != nil {
+				return err
+			}
+
+			var resp *gokuai.TokenResponse
+			if browserToken != nil {
+				// 记录登录请求参数
+				slog.Info("gokuai auth login request",
+					"exchange_token", browserToken.AccessToken,
+					"client_id", userClientID,
+					"grant_type", "exchange_token",
+				)
+				resp, err = authClient.ExchangeToken(browserToken.AccessToken, "passport")
+			} else {
+				// 记录登录请求参数（不包含密码）
+				slog.Info("gokuai auth login request",
+					"username", username,
+					"client_id", userClientID,
+					"grant_type", "password",
+				)
+				resp, err = authClient.LoginByPassword(username, password)
+			}
+
 			if err != nil {
 				slog.Error("gokuai auth login failed", "error", err)
 				return apperrors.NewAuth(fmt.Sprintf("登录失败: %v", err), apperrors.WithCause(err))
@@ -117,17 +113,69 @@ func newAuthLoginCommand() *cobra.Command {
 			return outputJSON(cmd, resp)
 		},
 	}
-	cmd.Flags().StringP("username", "u", "", "用户名")
-	cmd.Flags().StringP("password", "p", "", "密码")
+	cmd.Flags().BoolP("browser", "b", false, "打开浏览器访问 passport OAuth2 授权页登录 (跳转 GOKUAI_PASSPORT_DOMAIN/oauth/login)")
+	cmd.Flags().String("oauth-client-id", "", "浏览器 OAuth2 授权专用 Client ID (仅 --browser 模式，可使用环境变量 GOKUAI_OAUTH_CLIENT_ID)")
+	cmd.Flags().StringP("username", "u", "", "用户名 (密码登录时必需)")
+	cmd.Flags().StringP("password", "p", "", "密码 (密码登录时必需)")
 	cmd.Flags().String("client-id", "", "设备应用 Client ID (可使用环境变量 GOKUAI_CLIENT_ID)")
 	cmd.Flags().String("client-secret", "", "设备应用 Client Secret (可使用环境变量 GOKUAI_CLIENT_SECRET)")
 	if os.Getenv("GOKUAI_USER_CLIENT_ID") != "" {
 		_ = cmd.Flags().MarkHidden("client-id")
 		_ = cmd.Flags().MarkHidden("client-secret")
 	}
-	cmd.MarkFlagRequired("username")
-	cmd.MarkFlagRequired("password")
 	return cmd
+}
+
+// resolveBrowserOAuthClientID 返回浏览器 OAuth2 登录使用的独立 oauth
+// client_id，来源为 --oauth-client-id 或环境变量 GOKUAI_OAUTH_CLIENT_ID。
+//
+// 浏览器流程不需要 client_secret：授权页只需 client_id，用户登录后
+// passport 在服务端使用数据库中登记的 secret 自行完成 authorization_code
+// 换 token（见 gokuai-passport OAuthController/CoreAccount）。登录后调用
+// yk3 用户 API 的签名 secret 沿用既有的 GOKUAI_USER_CLIENT_SECRET
+// （getSecret 优先读取），需与该 client_id 配对；client_id 会落盘到
+// gokuai_user_cred.json，无需再配置 GOKUAI_USER_CLIENT_ID。
+func resolveBrowserOAuthClientID(cmd *cobra.Command) (string, error) {
+	clientID := getEnvOrFlag(cmd, "oauth-client-id", "GOKUAI_OAUTH_CLIENT_ID")
+	if clientID == "" {
+		return "", apperrors.NewValidation(
+			"浏览器登录需要配置 OAuth2 client_id，请通过 --oauth-client-id 传入或设置环境变量 GOKUAI_OAUTH_CLIENT_ID")
+	}
+	return clientID, nil
+}
+
+// resolveUserOAuthClient 解析登录使用的用户级 oauth 客户端：
+// 优先使用 GOKUAI_USER_CLIENT_ID/SECRET；否则用设备（企业）凭证通过
+// get_client_oauth 换取当前企业的个人授权 client_id/client_secret。
+// 返回的 AuthClient 与凭证三元组等价（密码登录需要前者发起请求，
+// 浏览器登录只需后两者构造授权 URL 及登录后保存）。
+func resolveUserOAuthClient(cmd *cobra.Command) (*gokuai.AuthClient, string, string, error) {
+	// 优先使用 GOKUAI_USER_CLIENT_ID/SECRET 直接登录
+	if id := os.Getenv("GOKUAI_USER_CLIENT_ID"); id != "" {
+		if secret := os.Getenv("GOKUAI_USER_CLIENT_SECRET"); secret != "" {
+			slog.Info("using GOKUAI_USER_CLIENT_ID for login")
+			return gokuai.NewAuthClient(id, secret), id, secret, nil
+		}
+	}
+
+	// 没有 user client id，走设备应用授权流程
+	clientID := getEnvOrFlag(cmd, "client-id", "GOKUAI_CLIENT_ID")
+	clientSecret := getEnvOrFlag(cmd, "client-secret", "GOKUAI_CLIENT_SECRET")
+
+	// 使用设备凭证获取用户授权凭证
+	client := gokuai.NewClient(clientID, clientSecret)
+
+	oauthResp, err := client.GetClientOAuth()
+	if err != nil {
+		slog.Error("gokuai get client oauth failed", "error", err)
+		return nil, "", "", apperrors.NewAuth(fmt.Sprintf("获取用户授权失败: %v", err), apperrors.WithCause(err))
+	}
+
+	slog.Info("gokuai get client oauth success",
+		"user_client_id", oauthResp.ClientID,
+	)
+
+	return gokuai.NewAuthClient(oauthResp.ClientID, oauthResp.ClientSecret), oauthResp.ClientID, oauthResp.ClientSecret, nil
 }
 
 func newAuthRefreshCommand() *cobra.Command {
@@ -213,12 +261,12 @@ func newAuthStatusCommand() *cobra.Command {
 
 			userClientID, _ := getUserClientID()
 			resp := map[string]interface{}{
-				"authenticated": true,
-				"member_id":     accountInfo.MemberID,
-				"member_name":   accountInfo.MemberName,
-				"member_email":  accountInfo.MemberEmail,
-				"member_account":        accountInfo.MemberAccount,
-				"client_id":     userClientID,
+				"authenticated":  true,
+				"member_id":      accountInfo.MemberID,
+				"member_name":    accountInfo.MemberName,
+				"member_email":   accountInfo.MemberEmail,
+				"member_account": accountInfo.MemberAccount,
+				"client_id":      userClientID,
 			}
 			return outputJSON(cmd, resp)
 		},

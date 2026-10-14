@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/) and this project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Browser OAuth2 login: `ykc auth login --browser` (`-b`) opens the passport `/oauth/login` authorization page and completes CLI login via a one-shot loopback (`127.0.0.1`) callback; the received tokens are stored in the same format as password login. Only needs a dedicated OAuth client id (`--oauth-client-id` or `GOKUAI_OAUTH_CLIENT_ID`, no secret — passport holds the secret server-side); post-login request signing continues to use `GOKUAI_USER_CLIENT_SECRET`. Honors the `BROWSER` environment variable for headless hosts
+- New `GOKUAI_PASSPORT_DOMAIN` configuration item (default `https://passport.gokuai.com`) for the passport web-authorization domain, used by browser login and overridable for private deployments and test environments
+
 ## [1.0.0] - 2026-06-24
 
 First public release of Yunku CLI (`ykc`).
