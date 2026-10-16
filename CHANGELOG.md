@@ -4,12 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/) and this project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-10-16
 
 ### Added
 
 - Browser OAuth2 login: `ykc auth login --browser` (`-b`) opens the passport `/oauth/login` authorization page and completes CLI login via a one-shot loopback (`127.0.0.1`) callback; the received tokens are stored in the same format as password login. Only needs a dedicated OAuth client id (`--oauth-client-id` or `GOKUAI_OAUTH_CLIENT_ID`, no secret — passport holds the secret server-side); post-login request signing continues to use `GOKUAI_USER_CLIENT_SECRET`. Honors the `BROWSER` environment variable for headless hosts
+- New `ykc auth web` command: opens the web console via SSO using the current CLI login state, no separate web login required; target address configurable with `--url` (defaults to `GOKUAI_API_HOST`)
 - New `GOKUAI_PASSPORT_DOMAIN` configuration item (default `https://passport.gokuai.com`) for the passport web-authorization domain, used by browser login and overridable for private deployments and test environments
+
+## [1.0.1] - 2026-09-22
+
+### Added
+
+- `ykc auth login` now sends device information (OS name/version, etc.) with the login request
+
+### Fixed
+
+- `ykc account servers` failed to parse when no arguments were passed
+- `ykc account upload-avatar` returned empty parameter values after a successful upload
+- Favorite list pagination: `--size` minimum is 50, and paging should use `next_start` from the response; `ykc file queue` now requires `--queue-id`
 
 ## [1.0.0] - 2026-06-24
 
